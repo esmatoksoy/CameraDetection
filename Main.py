@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 
 # Load variables from the .env file
-load_dotenv(dotenv_path=r"C:\Users\esma-\OneDrive\Masaüstü\CameraDetection\info.env")
+load_dotenv(dotenv_path=r"C:\Users\esma-\dev\CameraDetection\infos.env")
 
 # Read values from environment variables
 from_email = os.getenv("FROM_EMAIL")
