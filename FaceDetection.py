@@ -23,6 +23,6 @@ while cap.isOpened():
 cap.release()
 
 if face_found:
-    print("Face detected in the video.")8
+    print("Face detected in the video.")
 else:
     print("No face detected in the video.")
