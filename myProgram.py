@@ -1,0 +1,110 @@
+import cv2
+import numpy as np
+import time
+
+
+def video_capture(output_path="output.avi", duration=10):
+    cap = cv2.VideoCapture(0)
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(output_path, fourcc, 20.0, (640, 480))
+    start_time = time.time()
+    while int(time.time() - start_time) < duration:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        out.write(frame)
+    cap.release()
+    out.release()
+
+def detect_motion(threshold=30.5, check_interval=1, min_motion_pixels=10000):
+    cap = cv2.VideoCapture(0)
+    ret, prev_frame = cap.read()
+    if not ret:
+        print("Error: Cannot read from camera.")
+        cap.release()
+        return
+    prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+    while True:
+        time.sleep(check_interval)
+        ret, frame = cap.read()
+        if not ret:
+            break
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        diff = cv2.absdiff(prev_gray, gray)
+        non_zero_count = np.count_nonzero(diff > threshold)
+        if non_zero_count > min_motion_pixels:
+            print("Motion detected! Starting recording...")
+            cap.release()
+            video_capture()
+            break
+        prev_gray = gray
+    cap.release()
+
+def capture_frame_from_video(video_path='output.avi', output_image='face.jpg'):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Error: Cannot open video file {video_path}")
+        return
+
+    ret, frame = cap.read()
+    if ret:
+        cv2.imwrite(output_image, frame)
+        print(f"Frame saved as {output_image}")
+    else:
+        print("Error: Cannot read frame from video.")
+
+    cap.release()
+
+def faceDetect():
+    # Load the pre-trained Haar Cascade face detector
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+    # Open the video file
+    cap = cv2.VideoCapture(r"C:\Users\esma-\dev\CameraDetection\output.avi")
+
+    face_found = False
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+
+        if len(faces) > 0:
+            face_found = True
+            break
+
+    cap.release()
+
+    if face_found:
+        print("Face detected in the video.")
+        return True
+    else:
+        print("No face detected in the video.")
+        return False
+
+def send_face_detected_email():
+    from MailPhotoSender import MailPhotoSender
+    # Replace these with your actual credentials and recipient
+    FROM_EMAIL = "esmatoksoy3@gmail.com"
+    PASSWORD = "jfzb kgyx uicn bdor"
+    SMTP_SERVER = "smtp.gmail.com"
+    SMTP_PORT = 587
+    TO_EMAIL = "esma-toksoy@hotmail.com"
+
+    sender = MailPhotoSender(FROM_EMAIL, PASSWORD, SMTP_SERVER, SMTP_PORT)
+    subject = "Test Email with Image"
+    body = "This is a test email with an attached image."
+    image_path = r"C:\Users\esma-\dev\CameraDetection\face.jpg"
+
+    sender.send_mail_with_image(subject, body, TO_EMAIL, image_path)
+    print("Email with image sent successfully.")
+            
+if __name__ == "__main__":
+    detect_motion()
+    face_found = faceDetect()
+    if face_found == True:
+        capture_frame_from_video() 
+        send_face_detected_email()
