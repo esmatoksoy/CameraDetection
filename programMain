@@ -16,9 +16,13 @@ def video_capture(output_path="output.avi", duration=10):
     cap.release()
     out.release()
 
-def detect_motion(threshold=30.5, check_interval=1):
+def detect_motion(threshold=30.5, check_interval=1, min_motion_pixels=10000):
     cap = cv2.VideoCapture(0)
     ret, prev_frame = cap.read()
+    if not ret:
+        print("Error: Cannot read from camera.")
+        cap.release()
+        return
     prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
     while True:
         time.sleep(check_interval)
@@ -28,7 +32,7 @@ def detect_motion(threshold=30.5, check_interval=1):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         diff = cv2.absdiff(prev_gray, gray)
         non_zero_count = np.count_nonzero(diff > threshold)
-        if non_zero_count > 0:
+        if non_zero_count > min_motion_pixels:
             print("Motion detected! Starting recording...")
             cap.release()
             video_capture()
