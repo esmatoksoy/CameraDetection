@@ -3,7 +3,6 @@ import numpy as np
 import time
 import os
 
-
 def video_capture(output_path="output.avi", duration=10):
     cap = cv2.VideoCapture(0)
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
