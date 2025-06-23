@@ -76,8 +76,10 @@ def faceDetect():
 
     if face_found:
         print("Face detected in the video.")
+        return True
     else:
         print("No face detected in the video.")
+        return False
 
 def send_face_detected_email():
     from MailPhotoSender import MailPhotoSender
@@ -97,9 +99,8 @@ def send_face_detected_email():
     print("Email with image sent successfully.")
             
 if __name__ == "__main__":
-    # This script cannot wake the computer from sleep mode.
-    # It must be running while the computer is awake.
     detect_motion()
-    capture_frame_from_video()
-    faceDetect()
-    send_face_detected_email()
+    face_found = faceDetect()
+    if face_found == True:
+        capture_frame_from_video() 
+        send_face_detected_email()
