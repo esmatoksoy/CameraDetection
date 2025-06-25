@@ -24,27 +24,36 @@ if not all([FROM_EMAIL, PASSWORD, TO_EMAIL]):
     raise ValueError("Missing one or more required environment variables: FROM_EMAIL, PASSWORD, TO_EMAIL. Please check your infos.env file.")
 
 # ---- Motion Detection ----
-def record_on_motion(output_path=VIDEO_PATH, threshold=30, min_motion_pixels=10000, inactivity_timeout=5.0):
-    print(f"Starting motion detection. Output will be saved to: {output_path}")
+def record_on_motion(output_path="output.avi", threshold=30, min_motion_pixels=5000, inactivity_timeout=5.0):
+ 
     cap = cv2.VideoCapture(0)
+    # Check if the camera opened successfully
     if not cap.isOpened():
         print("Error: Cannot open camera.")
-        return False
+        return
 
-    ret, frame = cap.read()
+    # Try to get frame dimensions for the video writer, retrying if necessary
+    max_retries = 10
+    for _ in range(max_retries):
+        ret, frame = cap.read()
+        if ret:
+            break
+        time.sleep(0.2)  # Wait a bit before retrying
     if not ret:
-        print("Error: Cannot read frame.")
+        print("Error: Cannot read frame from camera after several attempts.")
         cap.release()
-        return False
-
+        return
     height, width, _ = frame.shape
+
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     out = None
     is_recording = False
     last_motion_time = None
 
     prev_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    prev_gray = cv2.GaussianBlur(prev_gray, (21, 21), 0)
+    prev_gray = cv2.GaussianBlur(prev_gray, (21, 21), 0) # Apply blur to reduce noise
+
+    print("Ready to detect motion. Press 'q' to quit.")
 
     while True:
         ret, frame = cap.read()
@@ -54,45 +63,58 @@ def record_on_motion(output_path=VIDEO_PATH, threshold=30, min_motion_pixels=100
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
+        # Compute the difference between the current and previous frame
         frame_delta = cv2.absdiff(prev_gray, gray)
         thresh = cv2.threshold(frame_delta, threshold, 255, cv2.THRESH_BINARY)[1]
+        
+        # Count the number of white pixels (indicating change)
         motion_pixel_count = np.count_nonzero(thresh)
 
-        if motion_pixel_count > min_motion_pixels:
+        motion_detected = motion_pixel_count > min_motion_pixels
+
+        if motion_detected:
             if not is_recording:
-                print("Motion detected! Recording...")
+                # Start recording when motion is first detected
+                print("Motion detected! Starting recording...")
                 is_recording = True
                 out = cv2.VideoWriter(output_path, fourcc, 20.0, (width, height))
+            
             last_motion_time = time.time()
 
         if is_recording:
+            # Write the frame to the file while recording
             out.write(frame)
+
+            # Check if motion has stopped for the timeout duration
             if time.time() - last_motion_time > inactivity_timeout:
-                print("No more motion. Stopping.")
-                break
+                print(f"Motion stopped. Finishing recording after {inactivity_timeout} seconds of inactivity.")
+                break # Exit the loop to save the video
 
         prev_gray = gray
-
+    # Cleanup
     if is_recording:
         out.release()
     cap.release()
     cv2.destroyAllWindows()
-    return is_recording
+    print(f"Video saved to {output_path}" if is_recording else "No motion was recorded.")
+    return is_recording # Return whether a video was actually created
 
-# ---- Frame Capture ----
-def capture_frame_from_video(video_path=VIDEO_PATH, output_image=IMAGE_PATH):
-    print(f"Capturing frame from video: {VIDEO_PATH}")
+def capture_frame_from_video(video_path='output.avi', output_image='face.jpg'):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print("Cannot open video.")
+        print(f"Error: Cannot open video file {video_path}")
         return False
+
     ret, frame = cap.read()
     if ret:
         cv2.imwrite(output_image, frame)
-        print("Frame saved.")
+        print(f"Frame saved as {output_image}")
+        cap.release()
         return True
-    cap.release()
-    return False
+    else:
+        print("Error: Cannot read frame from video.")
+        cap.release()
+        return False
 
 # ---- Face Detection ----
 def faceDetect(video_path=VIDEO_PATH):
@@ -232,7 +254,20 @@ def monitor_screen_lock():
 
 if __name__ == "__main__":
     setup_autostart()  # Adds auto-run on startup (first run only)
-    t = threading.Thread(target=monitor_screen_lock, daemon=True)
+    system = platform.system()
+    print(f"Detected OS: {system}")
+
+    def main_loop():
+        while True:
+            if is_screen_locked():
+                print("Screen locked. Starting motion detection.")
+                if record_on_motion(VIDEO_PATH):
+                    if faceDetect(VIDEO_PATH):
+                        if capture_frame_from_video(VIDEO_PATH, IMAGE_PATH):
+                            send_face_detected_email()
+            time.sleep(2)
+
+    t = threading.Thread(target=main_loop, daemon=True)
     t.start()
     # Keep main thread alive
     while True:
